@@ -1,0 +1,40 @@
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Data.Core;
+using Avalonia.Data.Core.Plugins;
+using System.Linq;
+using Avalonia.Markup.Xaml;
+using YtDlpDownloader.ViewModels;
+using YtDlpDownloader.Views;
+using System.Diagnostics;
+using YtDlpDownloader.Services.Implementations;
+
+namespace YtDlpDownloader;
+
+public partial class App : Application
+{
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+    }
+
+    public override void OnFrameworkInitializationCompleted()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var processRunner = new ProcessRunner();
+            var ytDlpService = new YtDlpService(processRunner);
+            var dependencyManager = new DependencyManager(processRunner);
+            var fileDialogService = new FileDialogService();
+
+            var mainWindowViewModel = new MainWindowViewModel(ytDlpService, dependencyManager, fileDialogService);
+
+            desktop.MainWindow = new MainWindow
+            {
+                DataContext = mainWindowViewModel
+            };
+        }
+
+        base.OnFrameworkInitializationCompleted();
+    }
+}
