@@ -1,13 +1,14 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:YtDlpDownloader.ViewModels"
+        xmlns:models="using:YtDlpDownloader.Models"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="750" d:DesignHeight="600"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="650"
         x:Class="YtDlpDownloader.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="YtDlp Downloader"
-        Width="750" Height="600"
+        Width="800" Height="650"
         WindowStartupLocation="CenterScreen"
         RequestedThemeVariant="Dark" 
         Background="#18181B">
@@ -23,30 +24,27 @@
             
             <Grid ColumnDefinitions="*, 150">
                 <TextBox Grid.Column="0"
-                         Text="{Binding VideoUrl}"
-                         PlaceholderText="https://..."
-                         Height="40"
-                         VerticalContentAlignment="Center"
-                         CornerRadius="4"
-                         FontSize="14"
-                         IsEnabled="{Binding !IsDownloading}"/>
+                    Text="{Binding VideoUrl}"
+                    PlaceholderText="https://..."
+                    Height="40"
+                    VerticalContentAlignment="Center"
+                    CornerRadius="4"
+                    FontSize="14"/>
                 
                 <Button Grid.Column="1"
-                        Content="Анализировать"
-                        Command="{Binding AnalyzeVideoCommand}"
-                        Margin="10,0,0,0"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Height="40"
-                        Background="#2563EB"
-                        Foreground="White"
-                        FontWeight="Bold"
-                        CornerRadius="4"
-                        IsEnabled="{Binding !IsDownloading}"/>
+                    Content="Анализировать"
+                    Command="{Binding AnalyzeVideoCommand}"
+                    Margin="10,0,0,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Height="40"
+                    Background="#2563EB"
+                    Foreground="White"
+                    FontWeight="Bold"
+                    CornerRadius="4"/>
             </Grid>
 
-            <!-- Полоса загрузки (поиск видео) -->
             <ProgressBar IsIndeterminate="True" 
                          Height="4" 
                          Margin="0,5,0,0"
@@ -56,36 +54,18 @@
         </StackPanel>
 
 
-        <!-- ================= БЛОК 2: ИНФОРМАЦИЯ О ВИДЕО ================= -->
-        <Border Grid.Row="1" 
-                Background="#27272A" 
-                BorderBrush="#3F3F46" 
-                BorderThickness="1" 
-                CornerRadius="6" 
-                Margin="0,20">
-            <Panel>
+        <!-- ================= БЛОК 2: КОНТЕНТ (КАРТОЧКА ИЛИ ОЧЕРЕДЬ) ================= -->
+        <Grid Grid.Row="1" Margin="0,20">
+            
+            <!-- Вариант А: Показываем карточку видео, если оно только что проанализировано -->
+            <Border Background="#27272A" 
+                    BorderBrush="#3F3F46" 
+                    BorderThickness="1" 
+                    CornerRadius="6"
+                    IsVisible="{Binding !!CurrentVideo}">
                 
-                <!-- Состояние 1: Пусто (Ожидание ввода) -->
-                <StackPanel VerticalAlignment="Center" 
-                            HorizontalAlignment="Center" 
-                            Spacing="10"
-                            IsVisible="{Binding CurrentVideo, Converter={x:Static ObjectConverters.IsNull}}">
-                    <TextBlock Text="Вставьте ссылку и нажмите «Анализировать»" 
-                               Foreground="#A1A1AA" 
-                               FontSize="16" 
-                               HorizontalAlignment="Center"/>
-                    <TextBlock Text="Поддерживаются YouTube, VK, Rutube и другие" 
-                               Foreground="#71717A" 
-                               FontSize="13" 
-                               HorizontalAlignment="Center"/>
-                </StackPanel>
-
-                <!-- Состояние 2: Видео найдено -->
-                <Grid IsVisible="{Binding CurrentVideo, Converter={x:Static ObjectConverters.IsNotNull}}" 
-                      ColumnDefinitions="Auto, *" 
-                      Margin="20">
-                    
-                    <!-- Превью видео (Левая колонка, пропорции 16:9) -->
+                <Grid ColumnDefinitions="Auto, *" Margin="20">
+                    <!-- Превью видео (Левая колонка) -->
                     <Border Grid.Column="0" 
                             Width="240" Height="135" 
                             Background="#18181B" 
@@ -95,13 +75,10 @@
                             ClipToBounds="True"
                             VerticalAlignment="Top">
                         <Panel>
-                            <!-- Заглушка (показывается если картинка еще грузится или отсутствует) -->
                             <PathIcon Data="M17,10.5V7A1,1,0,0,0,16,6H4A1,1,0,0,0,3,7v10a1,1,0,0,0,1,1H16a1,1,0,0,0,1-1V13.5l4,4V6.5Z"
                                       Width="40" Height="40" 
                                       Foreground="#52525B"
                                       IsVisible="{Binding PreviewImage, Converter={x:Static ObjectConverters.IsNull}}"/>
-                            
-                            <!-- Реальное превью из интернета -->
                             <Image Source="{Binding PreviewImage}" 
                                    Stretch="UniformToFill"
                                    IsVisible="{Binding PreviewImage, Converter={x:Static ObjectConverters.IsNotNull}}"/>
@@ -111,54 +88,163 @@
                     <!-- Детали и выбор формата (Правая колонка) -->
                     <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="8">
                         <TextBlock Text="{Binding CurrentVideo.Title}" 
-                                   Foreground="#F4F4F5" 
-                                   FontSize="18" 
-                                   FontWeight="Bold" 
-                                   TextWrapping="Wrap" 
-                                   MaxLines="3" 
-                                   TextTrimming="CharacterEllipsis"/>
+                                   Foreground="#F4F4F5" FontSize="18" FontWeight="Bold" 
+                                   TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
                         
-                        <TextBlock Text="{Binding CurrentVideo.Author}" 
-                                   Foreground="#A1A1AA" 
-                                   FontSize="14"/>
-                        
-                        <TextBlock Text="{Binding CurrentVideo.Duration, StringFormat='Длительность: {0}'}" 
-                                   Foreground="#A1A1AA" 
-                                   FontSize="14"/>
+                        <TextBlock Text="{Binding CurrentVideo.Author}" Foreground="#A1A1AA" FontSize="14"/>
+                        <TextBlock Text="{Binding CurrentVideo.Duration, StringFormat='Длительность: {0}'}" Foreground="#A1A1AA" FontSize="14"/>
 
-                        <Border Height="1" Background="#3F3F46" Margin="0,10"/>
+                        <Border Height="1" Background="#3F3F46" Margin="0,5"/>
 
-                        <!-- Выбор качества -->
-                        <TextBlock Text="Выберите качество:" 
-                                   Foreground="#E4E4E7" 
-                                   FontSize="14" 
-                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Выберите качество:" Foreground="#E4E4E7" FontSize="14" FontWeight="SemiBold"/>
                         
-                        <ComboBox ItemsSource="{Binding CurrentVideo.AvailableFormats}" 
-                                  SelectedItem="{Binding SelectedFormat}"
-                                  HorizontalAlignment="Stretch"
-                                  Height="40"
-                                  CornerRadius="4">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid ColumnDefinitions="120, 80, *">
-                                        <TextBlock Grid.Column="0" Text="{Binding Resolution}" Foreground="#F4F4F5" FontWeight="Medium"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding Extension}" Foreground="#A1A1AA"/>
-                                        <TextBlock Grid.Column="2" Text="{Binding FileSize}" Foreground="#60A5FA" HorizontalAlignment="Right"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
+                        <Grid ColumnDefinitions="*, Auto">
+                            <ComboBox Grid.Column="0" 
+                                      ItemsSource="{Binding CurrentVideo.AvailableFormats}" 
+                                      SelectedItem="{Binding SelectedFormat}"
+                                      HorizontalAlignment="Stretch" Height="40" CornerRadius="4">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="120, 80, *">
+                                            <TextBlock Grid.Column="0" Text="{Binding Resolution}" Foreground="#F4F4F5" FontWeight="Medium"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Extension}" Foreground="#A1A1AA"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding FileSize}" Foreground="#60A5FA" HorizontalAlignment="Right"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
+                            <!-- Кнопка добавления в очередь -->
+                            <Button Grid.Column="1" 
+                                    Content="В очередь" 
+                                    Command="{Binding AddToQueueCommand}"
+                                    Margin="10,0,0,0" Width="110" Height="40"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                    Background="#3B82F6" Foreground="White" FontWeight="Bold" CornerRadius="4"
+                                    IsEnabled="{Binding SelectedFormat, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                        </Grid>
                     </StackPanel>
                 </Grid>
-            </Panel>
-        </Border>
+            </Border>
+
+            <!-- Вариант Б: Показываем Очередь загрузок, если активного поиска видео нет -->
+            <Border Background="#27272A" 
+                    BorderBrush="#3F3F46" 
+                    BorderThickness="1" 
+                    CornerRadius="6"
+                    IsVisible="{Binding CurrentVideo, Converter={x:Static ObjectConverters.IsNull}}">
+                
+                <Grid RowDefinitions="Auto, *">
+                    <!-- Заголовок очереди с кнопкой Очистить всё -->
+                    <Border Grid.Row="0" Background="#1F1F22" Padding="15,10" CornerRadius="6,6,0,0">
+                        <Grid ColumnDefinitions="*, Auto, Auto">
+                            <TextBlock Grid.Column="0" Text="Очередь загрузок" Foreground="#F4F4F5" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding QueueTasks.Count, StringFormat='Задач: {0}'}" Foreground="#A1A1AA" FontSize="13" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                            
+                            <!-- Кнопка Очистить всё -->
+                            <Button Grid.Column="2" 
+                                    Content="Очистить всё" 
+                                    Command="{Binding ClearQueueCommand}"
+                                    Background="#EF4444" 
+                                    Foreground="White"
+                                    FontSize="11" 
+                                    FontWeight="Bold"
+                                    Padding="10,4"
+                                    CornerRadius="4"
+                                    IsEnabled="{Binding !IsDownloading}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Список задач -->
+                    <ListBox Grid.Row="1" 
+                             ItemsSource="{Binding QueueTasks}" 
+                             Background="Transparent" 
+                             BorderThickness="0">
+                        <!-- Заглушка, если очередь пуста -->
+                        <ListBox.Template>
+                            <ControlTemplate>
+                                <Panel>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsPresenter ItemsPanel="{TemplateBinding ItemsPanel}" />
+                                    </ScrollViewer>
+                                    <TextBlock Text="Очередь пуста. Проанализируйте ссылку и добавьте видео." 
+                                               Foreground="#71717A" FontSize="14"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               IsVisible="{Binding !QueueTasks.Count}"/>
+                                </Panel>
+                            </ControlTemplate>
+                        </ListBox.Template>
+
+                        <!-- Отрисовка каждого элемента очереди (DownloadTask) -->
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:DownloadTask">
+                                <Grid ColumnDefinitions="Auto, *, Auto" Margin="5,10" Height="60">
+                                    
+                                    <!-- Превью -->
+                                    <Border Grid.Column="0" Width="96" Height="54" Background="#18181B" CornerRadius="4" ClipToBounds="True">
+                                        <Panel>
+                                            <PathIcon Data="M17,10.5V7A1,1,0,0,0,16,6H4A1,1,0,0,0,3,7v10a1,1,0,0,0,1,1H16a1,1,0,0,0,1-1V13.5l4,4V6.5Z"
+                                                      Width="24" Height="24" Foreground="#52525B"
+                                                      IsVisible="{Binding PreviewImage, Converter={x:Static ObjectConverters.IsNull}}"/>
+                                            <Image Source="{Binding PreviewImage}" Stretch="UniformToFill"/>
+                                        </Panel>
+                                    </Border>
+
+                                    <!-- Метаданные и индивидуальный прогресс -->
+                                    <Grid Grid.Column="1" RowDefinitions="*, *" Margin="15,0" VerticalAlignment="Center">
+                                        <!-- Название и разрешение -->
+                                        <Grid Grid.Row="0" ColumnDefinitions="*, Auto">
+                                            <TextBlock Grid.Column="0" Text="{Binding Title}" Foreground="#F4F4F5" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding SelectedFormat.Resolution}" Foreground="#60A5FA" FontSize="12" Margin="10,0,0,0" FontWeight="Bold"/>
+                                        </Grid>
+                                        
+                                        <!-- Прогресс или инфо-строка -->
+                                        <Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="0,5,0,0">
+                                            <!-- Прогресс-бар для активной загрузки -->
+                                            <ProgressBar Grid.Column="0" Minimum="0" Maximum="100" Value="{Binding Progress}" Height="8" CornerRadius="4" Foreground="#10B981"
+                                                         IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DownloadStatus.Downloading}}"/>
+                                            
+                                            <!-- Статус текстом для остальных состояний -->
+                                            <TextBlock Grid.Column="0" FontSize="12" VerticalAlignment="Center"
+                                                       Text="В очереди..." Foreground="#A1A1AA" IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DownloadStatus.Pending}}"/>
+                                            <TextBlock Grid.Column="0" FontSize="12" VerticalAlignment="Center"
+                                                       Text="Завершено" Foreground="#10B981" IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DownloadStatus.Completed}}"/>
+                                            <TextBlock Grid.Column="0" FontSize="12" VerticalAlignment="Center"
+                                                       Text="Ошибка скачивания" Foreground="#EF4444" IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DownloadStatus.Failed}}"/>
+
+                                            <!-- Скорость / Время для активной загрузки -->
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="10,0,0,0"
+                                                        IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DownloadStatus.Downloading}}">
+                                                <TextBlock Text="{Binding Speed}" Foreground="#A1A1AA" FontSize="12" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding RemainingTime, StringFormat='Осталось: {0}'}" Foreground="#71717A" FontSize="12" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Grid>
+
+                                    <!-- Кнопка удаления из очереди (Крестик) -->
+                                    <Button Grid.Column="2" 
+                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RemoveTaskCommand}"
+                                            CommandParameter="{Binding}"
+                                            Background="Transparent" BorderThickness="0" Width="32" Height="32"
+                                            VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                            IsEnabled="{Binding !$parent[Window].((vm:MainWindowViewModel)DataContext).IsDownloading}">
+                                        <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" Width="16" Height="16" Foreground="#EF4444"/>
+                                    </Button>
+
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+            
+        </Grid>
 
 
         <!-- ================= БЛОК 3: ЗАГРУЗКА И СТАТУС ================= -->
         <StackPanel Grid.Row="2" Spacing="10">
 
-            <!-- ВЫБОР ПАПКИ СОХРАНЕНИЯ -->
+            <!-- Выбор папки сохранения -->
             <Grid ColumnDefinitions="*, Auto" Margin="0,5">
                 <TextBlock Text="{Binding DownloadFolderPath, StringFormat='Сохранить в: {0}'}" 
                            Foreground="#A1A1AA" 
@@ -166,19 +252,10 @@
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"/>
                 <Button Grid.Column="1" 
-                        Content="Обзор..." 
-                        Command="{Binding ChangeFolderCommand}"
-                        Margin="15,0,0,0"
-                        Padding="15,0"
-                        Height="32"
-                        VerticalContentAlignment="Center"
-                        Background="#27272A"
-                        BorderBrush="#3F3F46"
-                        BorderThickness="1"
-                        Foreground="#F4F4F5"
-                        FontSize="12"
-                        CornerRadius="4"
-                        IsEnabled="{Binding !IsDownloading}"/>
+                    Content="Обзор..." 
+                    Command="{Binding ChangeFolderCommand}"
+                    Margin="15,0,0,0" Padding="15,0" Height="32" VerticalContentAlignment="Center"
+                    Background="#27272A" BorderBrush="#3F3F46" BorderThickness="1" Foreground="#F4F4F5" FontSize="12" CornerRadius="4"/>
             </Grid>
             
             <TextBlock Text="{Binding StatusText}" 
@@ -186,44 +263,29 @@
                        FontSize="13" 
                        HorizontalAlignment="Left"/>
 
-            <Grid>
-                <!-- Кнопка скачивания -->
-                <Button Content="Скачать видео" 
-                        Command="{Binding DownloadVideoCommand}"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Height="50"
-                        Background="#10B981" 
-                        Foreground="White"
-                        FontSize="16"
-                        FontWeight="Bold"
-                        CornerRadius="4"
-                        IsEnabled="{Binding SelectedFormat, Converter={x:Static ObjectConverters.IsNotNull}}"
-                        IsVisible="{Binding !IsDownloading}"/>
+            <!-- Кнопка запуска всей очереди -->
+            <Button Content="Запустить скачивание очереди" 
+                    Command="{Binding StartDownloadCommand}"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Height="50"
+                    Background="#10B981" 
+                    Foreground="White"
+                    FontSize="16"
+                    FontWeight="Bold"
+                    CornerRadius="4"
+                    IsEnabled="{Binding !IsDownloading}"
+                    IsVisible="{Binding !IsDownloading}"/>
 
-                <!-- Прогресс загрузки -->
-                <Grid IsVisible="{Binding IsDownloading}" ColumnDefinitions="*, Auto" Height="50">
-                    <ProgressBar Grid.Column="0"
-                                 Minimum="0" Maximum="100" 
-                                 Value="{Binding DownloadProgress}" 
-                                 Height="20"
-                                 Foreground="#10B981"
-                                 Background="#27272A"
-                                 BorderBrush="#3F3F46"
-                                 BorderThickness="1"
-                                 CornerRadius="4"
-                                 VerticalAlignment="Center"/>
-                    
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding DownloadProgress, StringFormat='{}{0}%'}"
-                               Foreground="#F4F4F5"
-                               FontSize="16"
-                               FontWeight="Bold"
-                               Margin="15,0,0,0"
-                               VerticalAlignment="Center"/>
+            <!-- Индикатор процесса выполнения очереди в целом -->
+            <Border Height="50" Background="#1F1F22" CornerRadius="4" BorderBrush="#3F3F46" BorderThickness="1" Padding="15,0"
+                    IsVisible="{Binding IsDownloading}">
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Grid.Column="0" Text="Выполняется скачивание очереди задач..." Foreground="#F4F4F5" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="150" Height="10" Foreground="#10B981" VerticalAlignment="Center"/>
                 </Grid>
-            </Grid>
+            </Border>
             
         </StackPanel>
     </Grid>

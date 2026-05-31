@@ -11,7 +11,6 @@ namespace YtDlpDownloader.Services.Implementations;
 
 public class ProcessRunner : IProcessRunner
 {
-    // Получение всего текста сразу
     public async Task<string> RunAndGetOutputAsync(string fileName, string arguments)
     {
         var startInfo = CreateStartInfo(fileName, arguments);
@@ -34,6 +33,8 @@ public class ProcessRunner : IProcessRunner
 
         if (!process.Start())
             throw new InvalidOperationException($"Не удалось запустить процесс: {fileName}");
+
+        process.StandardInput.Close();
 
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
@@ -62,6 +63,8 @@ public class ProcessRunner : IProcessRunner
         if (!process.Start())
             throw new InvalidOperationException($"Не удалось запустить процесс {fileName}");
 
+        process.StandardInput.Close();
+
         process.BeginOutputReadLine();
 
         await process.WaitForExitAsync();
@@ -80,6 +83,7 @@ public class ProcessRunner : IProcessRunner
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true, 
+            RedirectStandardInput = true,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8
