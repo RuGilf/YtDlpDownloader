@@ -37,7 +37,7 @@
                     FontSize="14"/>
         </Grid>
 
-        <!-- ================= БЛОК ВВОДА ССЫЛКИ ================= -->
+        <!-- ================= БЛОК ВВОД ССЫЛКИ ================= -->
         <suki:GlassCard Grid.Row="1" Padding="16,12" Margin="0,0,0,16">
             <StackPanel Spacing="12">
                 <Grid ColumnDefinitions="*, Auto">
@@ -70,7 +70,7 @@
         <!-- ================= ЦЕНТРАЛЬНЫЙ БЛОК КОНТЕНТА ================= -->
         <Grid Grid.Row="2">
             
-            <!-- ВАРИАНТ А: Карточка видео со всеми жестко заданными настройками -->
+            <!-- ВАРИАНТ А: Карточка видео -->
             <suki:GlassCard IsVisible="{Binding CurrentVideo, Converter={x:Static ObjectConverters.IsNotNull}}" Padding="24" VerticalAlignment="Top">
                 <Grid ColumnDefinitions="Auto, *">
                     <!-- Превью -->
@@ -92,7 +92,7 @@
                         </Panel>
                     </Border>
 
-                    <!-- Описание и жестко заданные селекторы -->
+                    <!-- Описание и динамические ComboBox -->
                     <StackPanel Grid.Column="1" Margin="24,0,0,0" Spacing="8">
                         <TextBlock Text="{Binding CurrentVideo.Title}" 
                                    FontSize="20" FontWeight="SemiBold" 
@@ -101,52 +101,84 @@
                         <TextBlock Text="{Binding CurrentVideo.Author}" Opacity="0.6" FontSize="14" FontWeight="Medium"/>
                         <TextBlock Text="{Binding CurrentVideo.Duration, StringFormat='Длительность: {0}'}" Opacity="0.5" FontSize="13"/>
 
-                        <Border Height="1" Background="{DynamicResource SukiControlBorderBrush}" Margin="0,8"/>
+                        <Border Height="1" Background="{DynamicResource SukiControlBorderBrush}" Margin="0,10"/>
 
-                        <!-- Сетка жесткого выбора параметров -->
-                        <Grid ColumnDefinitions="*, *" Margin="0,5" RowDefinitions="Auto" HorizontalAlignment="Stretch">
-                            <!-- Выбор разрешения -->
-                            <StackPanel Grid.Column="0" Margin="0,0,10,0" Spacing="4">
-                                <TextBlock Text="Разрешение видео:" FontSize="12" Opacity="0.6" FontWeight="Medium"/>
+                        <!-- Сетка динамического выбора параметров -->
+                        <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto" Margin="0,5" HorizontalAlignment="Stretch">
+                            <!-- 1. Качество видео -->
+                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,12" Spacing="4">
+                                <TextBlock Text="Разрешение:" FontSize="12" Opacity="0.6" FontWeight="Medium"/>
                                 <ComboBox ItemsSource="{Binding Resolutions}"
                                           SelectedItem="{Binding SelectedResolution}"
                                           HorizontalAlignment="Stretch"
-                                          Height="36"
+                                          Height="38"
                                           CornerRadius="6"/>
                             </StackPanel>
 
-                            <!-- Выбор формата контейнера -->
-                            <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="4">
-                                <TextBlock Text="Контейнер / Формат:" FontSize="12" Opacity="0.6" FontWeight="Medium"/>
+                            <!-- 2. Формат контейнера -->
+                            <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,12" Spacing="4">
+                                <TextBlock Text="Формат файла:" FontSize="12" Opacity="0.6" FontWeight="Medium"/>
                                 <ComboBox ItemsSource="{Binding Containers}"
                                           SelectedItem="{Binding SelectedContainer}"
                                           HorizontalAlignment="Stretch"
-                                          Height="36"
+                                          Height="38"
+                                          CornerRadius="6"/>
+                            </StackPanel>
+
+                            <!-- 3. Выбор субтитров -->
+                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,10,0" Spacing="4">
+                                <TextBlock Text="Субтитры:" FontSize="12" Opacity="0.6" FontWeight="Medium"/>
+                                <ComboBox ItemsSource="{Binding Subtitles}"
+                                          SelectedItem="{Binding SelectedSubtitle}"
+                                          HorizontalAlignment="Stretch"
+                                          Height="38"
+                                          CornerRadius="6"/>
+                            </StackPanel>
+
+                            <!-- 4. Выбор аудиодорожки (дубляж) -->
+                            <StackPanel Grid.Row="1" Grid.Column="1" Margin="10,0,0,0" Spacing="4">
+                                <TextBlock Text="Аудиодорожка:" FontSize="12" Opacity="0.6" FontWeight="Medium"/>
+                                <ComboBox ItemsSource="{Binding AudioTracks}"
+                                          SelectedItem="{Binding SelectedAudioTrack}"
+                                          HorizontalAlignment="Stretch"
+                                          Height="38"
                                           CornerRadius="6"/>
                             </StackPanel>
                         </Grid>
 
-                        <!-- Панель опций загрузки (Галочки) -->
-                        <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,10">
-                            <CheckBox Content="Субтитры (RU)" IsChecked="{Binding DownloadSubtitles}"/>
-                            <CheckBox Content="Тэги метаданных" IsChecked="{Binding EmbedMetadata}"/>
+                        <!-- Панель опций -->
+                        <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,12">
+                            <CheckBox Content="Встроить тэги метаданных" IsChecked="{Binding EmbedMetadata}"/>
                             <CheckBox Content="Встроить обложку" IsChecked="{Binding EmbedThumbnail}"/>
                         </StackPanel>
 
-                        <!-- Кнопка добавления в очередь -->
-                        <Button Content="Добавить в очередь" 
-                                Command="{Binding AddToQueueCommand}"
-                                Classes="Flat Accent"
-                                Height="40"
-                                FontWeight="Bold"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Center"
-                                VerticalContentAlignment="Center"/>
+                        <!-- ДВЕ КНОПКИ: Назад и Добавить в очередь -->
+                        <Grid ColumnDefinitions="*, *" Margin="0,5">
+                            <Button Grid.Column="0"
+                                    Content="Назад к очереди" 
+                                    Command="{Binding CancelAnalysisCommand}"
+                                    Classes="Basic"
+                                    Height="40"
+                                    Margin="0,0,10,0"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"/>
+                            
+                            <Button Grid.Column="1"
+                                    Content="Добавить в очередь" 
+                                    Command="{Binding AddToQueueCommand}"
+                                    Classes="Flat Accent"
+                                    Height="40"
+                                    Margin="10,0,0,0"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
                 </Grid>
             </suki:GlassCard>
 
-            <!-- ВАРИАНТ Б: Очередь загрузок (Показывается, если активного анализа нет) -->
+            <!-- ВАРИАНТ Б: Очередь загрузок -->
             <suki:GlassCard IsVisible="{Binding CurrentVideo, Converter={x:Static ObjectConverters.IsNull}}" Padding="0">
                 <Grid RowDefinitions="Auto, *">
                     <Border Grid.Row="0" BorderBrush="{DynamicResource SukiControlBorderBrush}" BorderThickness="0,0,0,1" Padding="20,16" CornerRadius="16,16,0,0">
@@ -155,7 +187,7 @@
                             <TextBlock Grid.Column="1" Text="{Binding QueueTasks.Count, StringFormat='Задач: {0}'}" Opacity="0.5" FontSize="13" VerticalAlignment="Center" Margin="0,0,16,0"/>
                             
                             <Button Grid.Column="2" 
-                                    Content="Очистить всё" 
+                                    Content="Очистить" 
                                     Command="{Binding ClearQueueCommand}"
                                     Classes="Basic" 
                                     Foreground="#FF3B30"
@@ -186,13 +218,12 @@
                             </ControlTemplate>
                         </ListBox.Template>
 
-                        <!-- Шаблон одного элемента очереди (DownloadTask) -->
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="models:DownloadTask">
                                 <Border Background="{DynamicResource SukiControlBorderBrush}" CornerRadius="10" Margin="0,4" Padding="12">
                                     <Grid ColumnDefinitions="Auto, *, Auto" Height="54">
                                         
-                                        <!-- Превью в очереди -->
+                                        <!-- Превью -->
                                         <Border Grid.Column="0" Width="96" Height="54" CornerRadius="6" ClipToBounds="True" BoxShadow="0 2 8 0 #40000000">
                                             <Panel>
                                                 <Rectangle Fill="{DynamicResource SukiBackground}" />
@@ -203,11 +234,10 @@
                                             </Panel>
                                         </Border>
 
-                                        <!-- Прогресс и параметры конкретной задачи -->
+                                        <!-- Прогресс -->
                                         <Grid Grid.Column="1" RowDefinitions="*, *" Margin="16,0" VerticalAlignment="Center">
                                             <Grid Grid.Row="0" ColumnDefinitions="*, Auto">
                                                 <TextBlock Grid.Column="0" Text="{Binding Title}" FontWeight="Medium" FontSize="14" TextTrimming="CharacterEllipsis"/>
-                                                <!-- Отображаем выбранные жесткие параметры разрешения и контейнера -->
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                                                     <TextBlock Text="{Binding Options.Resolution}" Opacity="0.6" FontSize="12"/>
                                                     <TextBlock Text="{Binding Options.Container}" Foreground="{DynamicResource SukiPrimaryColor}" FontSize="12" FontWeight="Bold"/>
@@ -233,7 +263,7 @@
                                             </Grid>
                                         </Grid>
 
-                                        <!-- Удаление отдельной задачи -->
+                                        <!-- Удаление задачи -->
                                         <Button Grid.Column="2" 
                                                 Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RemoveTaskCommand}"
                                                 CommandParameter="{Binding}"
@@ -253,7 +283,7 @@
             
         </Grid>
 
-        <!-- ================= НИЖНИЙ БЛОК: УПРАВЛЕНИЕ ЗАГРУЗКОЙ ================= -->
+        <!-- ================= НИЖНИЙ БЛОК ================= -->
         <StackPanel Grid.Row="3" Spacing="16" Margin="0,16,0,0">
 
             <!-- Изменение папки -->
@@ -274,7 +304,7 @@
                         FontWeight="Medium"/>
             </Grid>
 
-            <!-- Кнопка запуска очереди / Статус-бар -->
+            <!-- Старт скачивания / Ход работы -->
             <Panel Height="48">
                 <Button Content="Начать загрузку" 
                         Command="{Binding StartDownloadCommand}"
@@ -288,9 +318,19 @@
                 <suki:GlassCard Padding="20,0" CornerRadius="8"
                                 IsVisible="{Binding IsDownloading}"
                                 HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                    <Grid ColumnDefinitions="*, Auto" VerticalAlignment="Center">
-                        <TextBlock Grid.Column="0" Text="Идёт загрузка очереди..." FontSize="14" FontWeight="Medium" Opacity="0.9"/>
-                        <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="120" Height="4" Classes="Accent" CornerRadius="2"/>
+                    <Grid ColumnDefinitions="*, Auto, Auto" VerticalAlignment="Center">
+                        <TextBlock Grid.Column="0" Text="Идёт загрузка очереди..." FontSize="14" FontWeight="Medium" Opacity="0.9" VerticalAlignment="Center"/>
+                        <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="120" Height="4" Classes="Accent" CornerRadius="2" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                        
+                        <!-- Кнопка принудительной остановки скачивания -->
+                        <Button Grid.Column="2" 
+                                Content="Остановить" 
+                                Command="{Binding StopDownloadCommand}"
+                                Classes="Basic" 
+                                Foreground="#FF3B30"
+                                FontSize="12"
+                                FontWeight="Bold"
+                                Padding="12,6"/>
                     </Grid>
                 </suki:GlassCard>
             </Panel>

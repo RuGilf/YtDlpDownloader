@@ -1,9 +1,9 @@
 using System;
 using System.IO;
-using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using YtDlpDownloader.Models;
 using YtDlpDownloader.Services.Interfaces;
@@ -18,7 +18,7 @@ public class YtDlpService : IYtDlpService
     private static readonly Regex ProgressRegex = new Regex(
         @"\[download\]\s+(?<percent>[0-9.]+)%\s+of\s+(?<size>.+?)\s+at\s+(?<speed>.+?)\s+ETA\s+(?<eta>.+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    
+
     public YtDlpService(IProcessRunner processRunner)
     {
         _processRunner = processRunner;
@@ -33,16 +33,15 @@ public class YtDlpService : IYtDlpService
     {
         if (string.IsNullOrWhiteSpace(output)) return string.Empty;
 
-        var lines = output.Split(new[] { '\r', '\n' },
-            System.StringSplitOptions.RemoveEmptyEntries);
-
+        var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (var line in lines)
         {
             var trimmed = line.Trim();
             if (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
+            {
                 return trimmed;
+            }
         }
-
         return output;
     }
 
@@ -54,11 +53,11 @@ public class YtDlpService : IYtDlpService
     public async Task<VideoInfo> GetVideoInfoAsync(string url)
     {
         var binary = GetBinaryName();
-
+        
         var args = IsPlaylistUrl(url)
             ? $"--flat-playlist --dump-single-json \"{url}\""
             : $"--dump-json \"{url}\"";
-
+        
         var jsonResult = await _processRunner.RunAndGetOutputAsync(binary, args);
         var cleanedJson = ExtractSingleJson(jsonResult);
 
@@ -71,7 +70,7 @@ public class YtDlpService : IYtDlpService
         return parser.Parse(root);
     }
 
-    public async Task DownloadVideoAsync(string url, DownloadOptions options, string outputFolder, IProgress<DownloadProgress> progress)
+    public async Task DownloadVideoAsync(string url, DownloadOptions options, string outputFolder, IProgress<DownloadProgress> progress, CancellationToken cancellationToken)
     {
         var binary = GetBinaryName();
         var args = BuildArguments(url, options, outputFolder);
@@ -92,7 +91,7 @@ public class YtDlpService : IYtDlpService
                     RemainingTime = eta
                 });
             }
-        });
+        }, cancellationToken);
     }
 
     private string BuildArguments(string url, DownloadOptions options, string outputFolder)
@@ -101,9 +100,13 @@ public class YtDlpService : IYtDlpService
         var extraFlags = "";
         var container = options.Container.ToLower();
 
+        var audioFilter = options.SelectedAudioTrack == "Оригинал"
+            ? "bestaudio"
+            : $"bestaudio[language={options.SelectedAudioTrack}]";
+
         if (container == "mp3")
         {
-            formatArg = "bestaudio/best";
+            formatArg = audioFilter;
             extraFlags += " -x --audio-format mp3";
         }
         else
@@ -120,30 +123,46 @@ public class YtDlpService : IYtDlpService
             if (container == "mp4")
             {
                 formatArg = string.IsNullOrEmpty(height)
-                    ? "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-                    : $"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}]";
+                    ? $"bestvideo[ext=mp4]+{audioFilter}[ext=m4a]/best[ext=mp4]/best"
+                    : $"bestvideo[height<={height}][ext=mp4]+{audioFilter}[ext=m4a]/best[height<={height}]";
 
                 extraFlags += " --merge-output-format mp4";
             }
             else
             {
                 formatArg = string.IsNullOrEmpty(height)
-                    ? "bestvideo+bestaudio/best"
-                    : $"bestvideo[height<={height}]+bestaudio/best[height<={height}]";
+                    ? $"bestvideo+{audioFilter}/best"
+                    : $"bestvideo[height<={height}]+{audioFilter}/best[height<={height}]";
 
                 extraFlags += $" --merge-output-format {container}";
             }
         }
 
-        if (options.DownloadSubtitles)
-            extraFlags += $" --write-subs --sub-langs \"{options.SubtitlesLanguage}\"";
-        
+        if (options.SelectedSubtitle != "Без субтитров")
+        {
+            bool isAuto = options.SelectedSubtitle.EndsWith(" (авто)");
+            var langCode = options.SelectedSubtitle.Replace(" (авто)", "").Trim();
+
+            if (isAuto)
+            {
+                extraFlags += $" --write-auto-subs --sub-langs \"{langCode}\"";
+            }
+            else
+            {
+                extraFlags += $" --write-subs --sub-langs \"{langCode}\"";
+            }
+        }
+
         if (options.EmbedThumbnail && container != "mp3")
+        {
             extraFlags += " --embed-thumbnail";
-        
+        }
+
         if (options.EmbedMetadata)
+        {
             extraFlags += " --embed-metadata";
-        
+        }
+
         return $"-f \"{formatArg}\" {extraFlags} -P \"{outputFolder}\" -o \"%(title)s.%(ext)s\" \"{url}\"";
     }
 }

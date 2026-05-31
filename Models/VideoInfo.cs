@@ -16,6 +16,10 @@ public class VideoInfo
     public string Duration { get; set; } = string.Empty;
     public string ThumbnailUrl { get; set; } = string.Empty;
     public List<VideoFormat> AvailableFormats { get; set; } = new();
-
     public List<PlaylistEntry>? PlaylistEntries { get; set; }
+
+    public List<string> AvailableResolutions { get; set; } = new();
+    public List<string> AvailableContainers { get; set; } = new();
+    public List<string> AvailableSubtitles { get; set; } = new();
+    public List<string> AvailableAudioTracks { get; set; } = new();
 }

@@ -10,6 +10,7 @@ public interface IDownloadQueueManager
 
     void AddTask(DownloadTask task);
     void RemoveTask(DownloadTask task);
+    void StopQueue();
 
     Task StartQueueAsync();
 }

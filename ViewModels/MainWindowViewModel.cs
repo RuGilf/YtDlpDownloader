@@ -29,14 +29,15 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private string _downloadFolderPath = string.Empty;
     [ObservableProperty] private Bitmap? _previewImage;
 
-    // Списки для жестко заданных ComboBox в UI
-    public List<string> Resolutions { get; } = new() { "Максимальное", "1080p", "720p", "480p", "360p" };
-    public List<string> Containers { get; } = new() { "MP4", "MKV", "WebM", "MP3" };
+    public ObservableCollection<string> Resolutions { get; } = new();
+    public ObservableCollection<string> Containers { get; } = new();
+    public ObservableCollection<string> Subtitles { get; } = new();
+    public ObservableCollection<string> AudioTracks { get; } = new();
 
-    // Свойства для хранения текущего выбора пользователя
     [ObservableProperty] private string _selectedResolution = "1080p";
     [ObservableProperty] private string _selectedContainer = "MP4";
-    [ObservableProperty] private bool _downloadSubtitles;
+    [ObservableProperty] private string _selectedSubtitle = "Без субтитров";
+    [ObservableProperty] private string _selectedAudioTrack = "Оригинал";
     [ObservableProperty] private bool _embedThumbnail = true;
     [ObservableProperty] private bool _embedMetadata = true;
 
@@ -87,6 +88,22 @@ public partial class MainWindowViewModel : ViewModelBase
             var video = await _ytDlpService.GetVideoInfoAsync(VideoUrl);
             CurrentVideo = video;
 
+            Resolutions.Clear();
+            foreach (var r in video.AvailableResolutions) Resolutions.Add(r);
+            SelectedResolution = Resolutions.Count > 0 ? Resolutions[0] : "Максимальное";
+
+            Containers.Clear();
+            foreach (var c in video.AvailableContainers) Containers.Add(c);
+            SelectedContainer = Containers.Count > 0 ? Containers[0] : "MP4";
+
+            Subtitles.Clear();
+            foreach (var s in video.AvailableSubtitles) Subtitles.Add(s);
+            SelectedSubtitle = "Без субтитров";
+
+            AudioTracks.Clear();
+            foreach (var a in video.AvailableAudioTracks) AudioTracks.Add(a);
+            SelectedAudioTrack = "Оригинал";
+
             StatusText = "Загрузка превью...";
             if (!string.IsNullOrEmpty(video.ThumbnailUrl))
             {
@@ -121,12 +138,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (CurrentVideo == null) return;
 
-        // Создаем единый объект жестких настроек на момент добавления
         var options = new DownloadOptions
         {
             Resolution = SelectedResolution,
             Container = SelectedContainer,
-            DownloadSubtitles = DownloadSubtitles,
+            SelectedSubtitle = SelectedSubtitle,
+            SelectedAudioTrack = SelectedAudioTrack,
             EmbedThumbnail = EmbedThumbnail,
             EmbedMetadata = EmbedMetadata
         };
@@ -140,7 +157,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     Title = entry.Title,
                     Author = entry.Author,
                     Url = entry.Url,
-                    Options = options, // Передаем жесткие настройки для каждого видео в плейлисте
+                    Options = options, 
                     DownloadFolderPath = DownloadFolderPath,
                     PreviewImage = null
                 };
@@ -155,7 +172,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 Title = CurrentVideo.Title,
                 Author = CurrentVideo.Author,
                 Url = VideoUrl,
-                Options = options, // Передаем жесткие настройки
+                Options = options, 
                 DownloadFolderPath = DownloadFolderPath,
                 PreviewImage = PreviewImage
             };
@@ -215,5 +232,21 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _downloadQueueManager.RemoveTask(task);
         StatusText = "Задача удалена из очереди";
+    }
+
+    [RelayCommand]
+    private void StopDownload()
+    {
+        _downloadQueueManager.StopQueue();
+        StatusText = "Скачивание очереди остановлено пользователем";
+    }
+
+    [RelayCommand]
+    private void CancelAnalysis()
+    {
+        CurrentVideo = null;
+        VideoUrl = string.Empty;
+        PreviewImage = null;
+        StatusText = "Анализ видео отменён";
     }
 }

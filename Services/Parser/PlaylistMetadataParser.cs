@@ -21,6 +21,7 @@ public class PlaylistMetadataParser : IMetadataParser
                 var entryTitle = entry.TryGetProperty("title", out var t) ? t.GetString() : "Без названия";
                 var entryId = entry.TryGetProperty("id", out var idProp) ? idProp.GetString() : string.Empty;
                 var entryAuthor = entry.TryGetProperty("uploader", out var u) ? u.GetString() : playlistAuthor;
+                
                 var entryUrl = $"https://www.youtube.com/watch?v={entryId}";
 
                 entriesList.Add(new PlaylistEntry
@@ -38,10 +39,11 @@ public class PlaylistMetadataParser : IMetadataParser
             Author = playlistAuthor ?? "Неизвестный автор",
             Duration = $"{entriesList.Count} видео",
             PlaylistEntries = entriesList,
-            AvailableFormats = new List<VideoFormat>
-            {
-                new() { FormatId = "best", Resolution = "Весь плейлист (Лучшее качество)", Extension = "mp4", FileSize = "Авто" }
-            }
+            
+            AvailableResolutions = new List<string> { "Максимальное", "1080p", "720p", "480p", "360p" },
+            AvailableContainers = new List<string> { "MP4", "MKV", "WebM", "MP3" },
+            AvailableSubtitles = new List<string> { "Без субтитров", "ru", "en" },
+            AvailableAudioTracks = new List<string> { "Оригинал" }
         };
     }
 }

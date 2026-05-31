@@ -1,10 +1,8 @@
 using System;
 using System.Diagnostics;
-using System.IO;
-using System.IO.Enumeration;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Markup.Xaml.MarkupExtensions;
 using YtDlpDownloader.Services.Interfaces;
 
 namespace YtDlpDownloader.Services.Implementations;
@@ -16,39 +14,39 @@ public class ProcessRunner : IProcessRunner
         var startInfo = CreateStartInfo(fileName, arguments);
 
         using var process = new Process { StartInfo = startInfo };
-
+        
         var outputBuilder = new StringBuilder();
         var errorBuilder = new StringBuilder();
 
         process.OutputDataReceived += (sender, args) =>
         {
-            if (args.Data != null)
-                outputBuilder.AppendLine(args.Data);
+            if (args.Data != null) outputBuilder.AppendLine(args.Data);
         };
         process.ErrorDataReceived += (sender, args) =>
         {
-            if (args.Data != null)
-                errorBuilder.AppendLine(args.Data);
+            if (args.Data != null) errorBuilder.AppendLine(args.Data);
         };
 
         if (!process.Start())
+        {
             throw new InvalidOperationException($"Не удалось запустить процесс: {fileName}");
+        }
 
         process.StandardInput.Close();
-
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
         await process.WaitForExitAsync();
 
         if (process.ExitCode != 0)
-            throw new Exception($"Процесс завершился с ошибкой (код {process.ExitCode})\nДетали: {errorBuilder}");
+        {
+            throw new Exception($"Процесс завершился с ошибкой (код {process.ExitCode}).\nДетали: {errorBuilder}");
+        }
 
         return outputBuilder.ToString();
     }
 
-    // Чтение выввода построчно
-    public async Task RunAndReadAsync(string fileName, string arguments, Action<string> onOutputReceived)
+    public async Task RunAndReadAsync(string fileName, string arguments, Action<string> onOutputReceived, CancellationToken cancellationToken)
     {
         var startInfo = CreateStartInfo(fileName, arguments);
 
@@ -57,23 +55,46 @@ public class ProcessRunner : IProcessRunner
         process.OutputDataReceived += (sender, args) =>
         {
             if (args.Data != null)
+            {
                 onOutputReceived(args.Data);
+            }
         };
 
         if (!process.Start())
-            throw new InvalidOperationException($"Не удалось запустить процесс {fileName}");
+        {
+            throw new InvalidOperationException($"Не удалось запустить процесс: {fileName}");
+        }
 
         process.StandardInput.Close();
-
         process.BeginOutputReadLine();
 
-        await process.WaitForExitAsync();
+        using var registration = cancellationToken.Register(() =>
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(true); 
+                }
+            }
+            catch { }
+        });
 
-        if (process.ExitCode != 0)
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw new Exception("Скачивание было отменено пользователем.");
+        }
+
+        if (process.ExitCode != 0 && !cancellationToken.IsCancellationRequested)
+        {
             throw new Exception($"Процесс скачивания прервался с кодом {process.ExitCode}");
+        }
     }
 
-    // Метод для настройки параметров запуска процесса
     private ProcessStartInfo CreateStartInfo(string fileName, string arguments)
     {
         return new ProcessStartInfo
@@ -82,7 +103,7 @@ public class ProcessRunner : IProcessRunner
             Arguments = arguments,
             UseShellExecute = false,
             RedirectStandardOutput = true,
-            RedirectStandardError = true, 
+            RedirectStandardError = true,
             RedirectStandardInput = true,
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
