@@ -7,5 +7,5 @@ namespace YtDlpDownloader.Services.Interfaces;
 public interface IYtDlpService
 {
     Task<VideoInfo> GetVideoInfoAsync(string url);
-    Task DownloadVideoAsync(string url, VideoFormat format, string outputFolder, IProgress<DownloadProgress> progress);
+    Task DownloadVideoAsync(string url, DownloadOptions options, string outputFolder, IProgress<DownloadProgress> progress);
 }

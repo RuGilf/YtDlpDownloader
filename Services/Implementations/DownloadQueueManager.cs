@@ -66,7 +66,7 @@ public class DownloadQueueManager : IDownloadQueueManager
 
                         await _ytDlpService.DownloadVideoAsync(
                             task.Url,
-                            task.SelectedFormat!,
+                            task.Options!,
                             task.DownloadFolderPath,
                             progressReporter);
 

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Text.Json;
+using Microsoft.VisualBasic;
 using YtDlpDownloader.Models;
 
 namespace YtDlpDownloader.Services.Parser;
@@ -27,6 +29,10 @@ public class VideoMetadataParser : IMetadataParser
                 var formatId = f.TryGetProperty("format_id", out var id) ? id.GetString() : string.Empty;
                 var ext = f.TryGetProperty("ext", out var extension) ? extension.GetString() : string.Empty;
 
+                var acodec = f.TryGetProperty("acodec", out var ac) ? ac.GetString() : string.Empty;
+                var vcodec = f.TryGetProperty("vcodec", out var vc) ? vc.GetString() : string.Empty;
+                bool isVideoOnly = acodec == "none" && vcodec != "none";
+
                 long? fileSize = f.TryGetProperty("filesize", out var fs) && 
                     fs.ValueKind == JsonValueKind.Number ? fs.GetInt64() : null;
                 long? approx = f.TryGetProperty("filesize_approx", out var approxProp) &&
@@ -37,7 +43,8 @@ public class VideoMetadataParser : IMetadataParser
                     FormatId = formatId ?? string.Empty,
                     Extension = ext ?? string.Empty,
                     Resolution = resolution,
-                    FileSize = FormatBytes(fileSize ?? approx)
+                    FileSize = FormatBytes(fileSize ?? approx),
+                    IsVideoOnly = isVideoOnly
                 });
             }
         }

@@ -71,14 +71,10 @@ public class YtDlpService : IYtDlpService
         return parser.Parse(root);
     }
 
-    public async Task DownloadVideoAsync(string url, VideoFormat format, string outputFolder, IProgress<DownloadProgress> progress)
+    public async Task DownloadVideoAsync(string url, DownloadOptions options, string outputFolder, IProgress<DownloadProgress> progress)
     {
         var binary = GetBinaryName();
-        var outputPath = Path.Combine(outputFolder, "%(title)s.%(ext)s");
-
-        var formatArgs = format.FormatId == "best" ? "bestvideo+bestaudio/best"
-            : format.FormatId;
-        var args = $"-f \"{formatArgs}\" -P \"{outputFolder}\" -o \"%(title)s.%(ext)s\" \"{url}\"";
+        var args = BuildArguments(url, options, outputFolder);
 
         await _processRunner.RunAndReadAsync(binary, args, line =>
         {
@@ -97,5 +93,57 @@ public class YtDlpService : IYtDlpService
                 });
             }
         });
+    }
+
+    private string BuildArguments(string url, DownloadOptions options, string outputFolder)
+    {
+        var formatArg = "";
+        var extraFlags = "";
+        var container = options.Container.ToLower();
+
+        if (container == "mp3")
+        {
+            formatArg = "bestaudio/best";
+            extraFlags += " -x --audio-format mp3";
+        }
+        else
+        {
+            var height = options.Resolution switch
+            {
+                "1080p" => "1080",
+                "720p" => "720",
+                "480p" => "480",
+                "360p" => "360",
+                _ => string.Empty
+            };
+
+            if (container == "mp4")
+            {
+                formatArg = string.IsNullOrEmpty(height)
+                    ? "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+                    : $"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}]";
+
+                extraFlags += " --merge-output-format mp4";
+            }
+            else
+            {
+                formatArg = string.IsNullOrEmpty(height)
+                    ? "bestvideo+bestaudio/best"
+                    : $"bestvideo[height<={height}]+bestaudio/best[height<={height}]";
+
+                extraFlags += $" --merge-output-format {container}";
+            }
+        }
+
+        if (options.DownloadSubtitles)
+            extraFlags += $" --write-subs --sub-langs \"{options.SubtitlesLanguage}\"";
+        
+        if (options.EmbedThumbnail && container != "mp3")
+            extraFlags += " --embed-thumbnail";
+        
+        if (options.EmbedMetadata)
+            extraFlags += " --embed-metadata";
+        
+        return $"-f \"{formatArg}\" {extraFlags} -P \"{outputFolder}\" -o \"%(title)s.%(ext)s\" \"{url}\"";
     }
 }

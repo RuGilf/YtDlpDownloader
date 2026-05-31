@@ -1,7 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Net;
 using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -24,17 +24,29 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private bool _isDownloading;
     [ObservableProperty] private VideoInfo? _currentVideo;
-    [ObservableProperty] private VideoFormat? _selectedFormat;
-    [ObservableProperty] private double _downloadProgress;
     [ObservableProperty] private string _statusText = "Готов к работе";
     [ObservableProperty] private bool _dependenciesMissing;
-
     [ObservableProperty] private string _downloadFolderPath = string.Empty;
     [ObservableProperty] private Bitmap? _previewImage;
 
+    // Списки для жестко заданных ComboBox в UI
+    public List<string> Resolutions { get; } = new() { "Максимальное", "1080p", "720p", "480p", "360p" };
+    public List<string> Containers { get; } = new() { "MP4", "MKV", "WebM", "MP3" };
+
+    // Свойства для хранения текущего выбора пользователя
+    [ObservableProperty] private string _selectedResolution = "1080p";
+    [ObservableProperty] private string _selectedContainer = "MP4";
+    [ObservableProperty] private bool _downloadSubtitles;
+    [ObservableProperty] private bool _embedThumbnail = true;
+    [ObservableProperty] private bool _embedMetadata = true;
+
     public ObservableCollection<DownloadTask> QueueTasks => _downloadQueueManager.Tasks;
 
-    public MainWindowViewModel(IYtDlpService ytDlpService, IDependencyManager dependencyManager, IFileDialogService fileDialogService, IDownloadQueueManager downloadQueueManager)
+    public MainWindowViewModel(
+        IYtDlpService ytDlpService, 
+        IDependencyManager dependencyManager,
+        IFileDialogService fileDialogService,
+        IDownloadQueueManager downloadQueueManager)
     {
         _ytDlpService = ytDlpService;
         _dependencyManager = dependencyManager;
@@ -52,7 +64,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!exist)
         {
             DependenciesMissing = true;
-            StatusText = "Ошибка: установите yt-dlp и ffmpeg в вашей системе!";
+            StatusText = "Ошибка: Установите yt-dlp и ffmpeg в вашей системе!";
         }
     }
 
@@ -68,18 +80,20 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             IsLoading = true;
-            StatusText = "Анализирую видео...";
+            StatusText = "Анализируем ссылку...";
             CurrentVideo = null;
             PreviewImage = null;
 
             var video = await _ytDlpService.GetVideoInfoAsync(VideoUrl);
             CurrentVideo = video;
+
             StatusText = "Загрузка превью...";
-
             if (!string.IsNullOrEmpty(video.ThumbnailUrl))
+            {
                 PreviewImage = await ImageLoader.LoadFromUrlAsync(video.ThumbnailUrl);
+            }
 
-            StatusText = "Видео добавлено в очередь";
+            StatusText = "Выберите настройки и добавьте в очередь";
         }
         catch (Exception ex)
         {
@@ -98,93 +112,84 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!string.IsNullOrEmpty(selectedFolder))
         {
             DownloadFolderPath = selectedFolder;
-            StatusText = $"Папка сохранения изменена на {Path.GetFileName(selectedFolder)}";
-        }
-    }
-
-    [RelayCommand]
-    private async Task DownloadVideoAsync()
-    {
-        if (CurrentVideo == null || SelectedFormat == null)
-        {
-            StatusText = "Выберите видео и формат для скачивания";
-            return;
-        }
-
-        try
-        {
-            IsDownloading = true;
-            DownloadProgress = 0;
-            StatusText = "Подготовка к скачиванию...";
-
-            var downloadsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), DownloadFolderPath);
-
-            var progressReporter = new Progress<DownloadProgress>(p =>
-            {
-                DownloadProgress = p.Percentage;
-                StatusText = $"Скачивание: {p.Percentage}% | Скорость: {p.Speed} | Осталось: {p.RemainingTime}";
-            });
-
-            await _ytDlpService.DownloadVideoAsync(VideoUrl, SelectedFormat, downloadsFolder, progressReporter);
-            StatusText = "Скачивание завершено! Файл сохранён в папку Загрузки";
-        }
-        catch (Exception ex)
-        {
-            StatusText = $"Ошибка скачивания: {ex.Message}";
-        }
-        finally
-        {
-            IsDownloading = false;
+            StatusText = $"Папка сохранения: {Path.GetFileName(selectedFolder)}";
         }
     }
 
     [RelayCommand]
     private void AddToQueue()
     {
-        if (CurrentVideo == null || SelectedFormat == null)
-            return;
+        if (CurrentVideo == null) return;
 
-        var task = new DownloadTask
+        // Создаем единый объект жестких настроек на момент добавления
+        var options = new DownloadOptions
         {
-            Title = CurrentVideo.Title,
-            Author = CurrentVideo.Author,
-            Url = VideoUrl,
-            SelectedFormat = SelectedFormat,
-            DownloadFolderPath = DownloadFolderPath,
-            PreviewImage = PreviewImage
+            Resolution = SelectedResolution,
+            Container = SelectedContainer,
+            DownloadSubtitles = DownloadSubtitles,
+            EmbedThumbnail = EmbedThumbnail,
+            EmbedMetadata = EmbedMetadata
         };
 
-        _downloadQueueManager.AddTask(task);
+        if (CurrentVideo.PlaylistEntries != null && CurrentVideo.PlaylistEntries.Count > 0)
+        {
+            foreach (var entry in CurrentVideo.PlaylistEntries)
+            {
+                var task = new DownloadTask
+                {
+                    Title = entry.Title,
+                    Author = entry.Author,
+                    Url = entry.Url,
+                    Options = options, // Передаем жесткие настройки для каждого видео в плейлисте
+                    DownloadFolderPath = DownloadFolderPath,
+                    PreviewImage = null
+                };
+                _downloadQueueManager.AddTask(task);
+            }
+            StatusText = $"Добавлено в очередь {CurrentVideo.PlaylistEntries.Count} видео из плейлиста.";
+        }
+        else
+        {
+            var task = new DownloadTask
+            {
+                Title = CurrentVideo.Title,
+                Author = CurrentVideo.Author,
+                Url = VideoUrl,
+                Options = options, // Передаем жесткие настройки
+                DownloadFolderPath = DownloadFolderPath,
+                PreviewImage = PreviewImage
+            };
+            _downloadQueueManager.AddTask(task);
+            StatusText = $"Добавлено в очередь: {task.Title} [{SelectedResolution} | {SelectedContainer}]";
+        }
 
         VideoUrl = string.Empty;
         CurrentVideo = null;
         PreviewImage = null;
-        SelectedFormat = null;
 
-        StatusText = $"Добавлено в очередь: {task.Title}";
+        if (!IsDownloading)
+        {
+            Task.Run(async () => await StartDownloadAsync());
+        }
     }
 
     [RelayCommand]
-    private async Task StartDownload()
+    private async Task StartDownloadAsync()
     {
-        if (QueueTasks.Count == 0)
-        {
-            StatusText = "Очередь загрузок пуста!";
-            return;
-        }
+        if (QueueTasks.Count == 0) return;
 
         try
         {
             IsDownloading = true;
-            StatusText = "Запуск очереди загрузок...";
-
+            StatusText = "Выполняется скачивание очереди...";
+            
             await _downloadQueueManager.StartQueueAsync();
 
-            StatusText = "Все загрузки из очереди завершены";
+            StatusText = "Все загрузки завершены!";
         }
         catch (Exception ex)
         {
-            StatusText = $"Ошибка обработки очереди {ex.Message}";
+            StatusText = $"Ошибка очереди: {ex.Message}";
         }
         finally
         {
@@ -196,8 +201,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private void ClearQueue()
     {
         for (int i = QueueTasks.Count - 1; i >= 0; i--)
+        {
             if (QueueTasks[i].Status != DownloadStatus.Downloading)
+            {
                 _downloadQueueManager.Tasks.RemoveAt(i);
+            }
+        }
         StatusText = "Очередь очищена от неактивных задач";
     }
 
@@ -205,6 +214,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private void RemoveTask(DownloadTask task)
     {
         _downloadQueueManager.RemoveTask(task);
-        StatusText = "Видео удалено из очереди";
+        StatusText = "Задача удалена из очереди";
     }
 }

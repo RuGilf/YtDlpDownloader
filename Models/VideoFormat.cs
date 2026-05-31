@@ -6,4 +6,5 @@ public class VideoFormat
     public string Extension { get; set; } = string.Empty;
     public string Resolution { get; set; } = string.Empty;
     public string FileSize { get; set; } = string.Empty;
+    public bool IsVideoOnly { get; set; }
 }
