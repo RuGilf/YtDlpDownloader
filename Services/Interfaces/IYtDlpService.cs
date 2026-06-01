@@ -7,6 +7,6 @@ namespace YtDlpDownloader.Services.Interfaces;
 
 public interface IYtDlpService
 {
-    Task<VideoInfo> GetVideoInfoAsync(string url);
+    Task<VideoInfo> GetVideoInfoAsync(string url, CancellationToken cancellationToken = default);
     Task DownloadVideoAsync(string url, DownloadOptions options, string outputFolder, IProgress<DownloadProgress> progress, CancellationToken cancellationToken);
 }

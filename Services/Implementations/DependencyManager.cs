@@ -1,7 +1,4 @@
 using System;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using YtDlpDownloader.Services.Interfaces;
 
@@ -17,35 +14,36 @@ public class DependencyManager : IDependencyManager
     }
 
     private string GetYtDlpBinary() =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "yt-dlp.exe" : "yt-dlp";
+        ExternalToolResolver.ResolveExecutable(ExternalToolResolver.GetYtDlpBinaryName());
     
     private string GetFfmpegBinary() =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "ffmpeg.exe" : "ffmpeg";
+        ExternalToolResolver.ResolveExecutable(ExternalToolResolver.GetFfmpegBinaryName());
     
     public async Task<bool> CheckDependenciesExistAsync()
     {
-        bool ytDlpExists = await CheckBinaryExistsAsync(GetYtDlpBinary(), "--version");
-        bool ffmpegExists = await CheckBinaryExistsAsync(GetFfmpegBinary(), "-version");
+        bool ytDlpExists = await CheckBinaryExistsAsync(ExternalToolResolver.GetYtDlpBinaryName(), "--version");
+        bool ffmpegExists = await CheckBinaryExistsAsync(ExternalToolResolver.GetFfmpegBinaryName(), "-version");
 
         return ytDlpExists && ffmpegExists;
     }
 
     public async Task DownloadDependenciesAsync(IProgress<double> downloadProgress)
     {
-        await Task.CompletedTask;
+        await Task.FromException(new NotSupportedException("Автоматическая загрузка зависимостей не реализована. Установите yt-dlp и ffmpeg вручную или поместите их в папку tools рядом с приложением."));
     }
 
     public async Task UpdateYtDlpAsync()
     {
         var binary = GetYtDlpBinary();
-        await _processRunner.RunAndGetOutputAsync(binary, "--update");
+        await _processRunner.RunAndGetOutputAsync(binary, ["--update"]);
     }
 
-    private async Task<bool> CheckBinaryExistsAsync(string binary, string testArgs)
+    private async Task<bool> CheckBinaryExistsAsync(string binaryName, string testArgs)
     {
         try
         {
-            await _processRunner.RunAndGetOutputAsync(binary, testArgs);
+            var binary = ExternalToolResolver.ResolveExecutable(binaryName);
+            await _processRunner.RunAndGetOutputAsync(binary, [testArgs]);
             return true;
         }
         catch

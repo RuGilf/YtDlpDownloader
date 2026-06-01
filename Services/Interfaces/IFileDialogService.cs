@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace YtDlpDownloader.Services.Implementations;
+namespace YtDlpDownloader.Services.Interfaces;
 
 public interface IFileDialogService
 {

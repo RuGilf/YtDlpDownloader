@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,7 +11,7 @@ namespace YtDlpDownloader.Services.Implementations;
 
 public class ProcessRunner : IProcessRunner
 {
-    public async Task<string> RunAndGetOutputAsync(string fileName, string arguments)
+    public async Task<string> RunAndGetOutputAsync(string fileName, IReadOnlyList<string> arguments, CancellationToken cancellationToken = default)
     {
         var startInfo = CreateStartInfo(fileName, arguments);
 
@@ -17,14 +19,28 @@ public class ProcessRunner : IProcessRunner
         
         var outputBuilder = new StringBuilder();
         var errorBuilder = new StringBuilder();
+        var outputLock = new object();
+        var errorLock = new object();
 
         process.OutputDataReceived += (sender, args) =>
         {
-            if (args.Data != null) outputBuilder.AppendLine(args.Data);
+            if (args.Data != null)
+            {
+                lock (outputLock)
+                {
+                    outputBuilder.AppendLine(args.Data);
+                }
+            }
         };
         process.ErrorDataReceived += (sender, args) =>
         {
-            if (args.Data != null) errorBuilder.AppendLine(args.Data);
+            if (args.Data != null)
+            {
+                lock (errorLock)
+                {
+                    errorBuilder.AppendLine(args.Data);
+                }
+            }
         };
 
         if (!process.Start())
@@ -36,26 +52,55 @@ public class ProcessRunner : IProcessRunner
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        await process.WaitForExitAsync();
+        using var registration = cancellationToken.Register(() =>
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(true);
+                }
+            }
+            catch { }
+        });
+
+        await process.WaitForExitAsync(cancellationToken);
 
         if (process.ExitCode != 0)
         {
             throw new Exception($"Процесс завершился с ошибкой (код {process.ExitCode}).\nДетали: {errorBuilder}");
         }
 
-        return outputBuilder.ToString();
+        lock (outputLock)
+        {
+            return outputBuilder.ToString();
+        }
     }
 
-    public async Task RunAndReadAsync(string fileName, string arguments, Action<string> onOutputReceived, CancellationToken cancellationToken)
+    public async Task RunAndReadAsync(string fileName, IReadOnlyList<string> arguments, Action<string> onOutputReceived, CancellationToken cancellationToken)
     {
         var startInfo = CreateStartInfo(fileName, arguments);
 
         using var process = new Process { StartInfo = startInfo };
+        var errorBuilder = new StringBuilder();
+        var errorLock = new object();
 
         process.OutputDataReceived += (sender, args) =>
         {
             if (args.Data != null)
             {
+                onOutputReceived(args.Data);
+            }
+        };
+        process.ErrorDataReceived += (sender, args) =>
+        {
+            if (args.Data != null)
+            {
+                lock (errorLock)
+                {
+                    errorBuilder.AppendLine(args.Data);
+                }
+
                 onOutputReceived(args.Data);
             }
         };
@@ -67,6 +112,7 @@ public class ProcessRunner : IProcessRunner
 
         process.StandardInput.Close();
         process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
 
         using var registration = cancellationToken.Register(() =>
         {
@@ -91,16 +137,26 @@ public class ProcessRunner : IProcessRunner
 
         if (process.ExitCode != 0 && !cancellationToken.IsCancellationRequested)
         {
-            throw new Exception($"Процесс скачивания прервался с кодом {process.ExitCode}");
+            string details;
+            lock (errorLock)
+            {
+                details = errorBuilder.ToString();
+            }
+
+            throw new Exception($"Процесс скачивания прервался с кодом {process.ExitCode}.\nДетали: {details}");
         }
     }
 
-    private ProcessStartInfo CreateStartInfo(string fileName, string arguments)
+    private ProcessStartInfo CreateStartInfo(string fileName, IReadOnlyList<string> arguments)
     {
-        return new ProcessStartInfo
+        if (!Path.IsPathFullyQualified(fileName))
+        {
+            throw new InvalidOperationException($"Для запуска процесса требуется абсолютный путь: {fileName}");
+        }
+
+        var startInfo = new ProcessStartInfo
         {
             FileName = fileName,
-            Arguments = arguments,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -109,5 +165,12 @@ public class ProcessRunner : IProcessRunner
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8
         };
+
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        return startInfo;
     }
 }

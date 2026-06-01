@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
+using YtDlpDownloader.Services.Interfaces;
 
 namespace YtDlpDownloader.Services.Implementations;
 

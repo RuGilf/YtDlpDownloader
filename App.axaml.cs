@@ -27,8 +27,16 @@ public partial class App : Application
             var dependencyManager = new DependencyManager(processRunner);
             var fileDialogService = new FileDialogService();
             var downloadQueueManager = new DownloadQueueManager(ytDlpService);
+            var imageLoader = new ImageLoader();
+            var downloadTaskFactory = new DownloadTaskFactory();
 
-            var mainWindowViewModel = new MainWindowViewModel(ytDlpService, dependencyManager, fileDialogService, downloadQueueManager);
+            var mainWindowViewModel = new MainWindowViewModel(
+                ytDlpService,
+                dependencyManager,
+                fileDialogService,
+                downloadQueueManager,
+                imageLoader,
+                downloadTaskFactory);
 
             desktop.MainWindow = new MainWindow
             {

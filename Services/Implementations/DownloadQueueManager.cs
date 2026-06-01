@@ -11,6 +11,7 @@ public class DownloadQueueManager : IDownloadQueueManager
 {
     private readonly IYtDlpService _ytDlpService;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly object _stateLock = new();
     private bool _isProcessing;
     private CancellationTokenSource? _cts;
 
@@ -23,30 +24,54 @@ public class DownloadQueueManager : IDownloadQueueManager
 
     public void AddTask(DownloadTask task)
     {
-        Tasks.Add(task);
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Tasks.Add(task);
+            return;
+        }
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => Tasks.Add(task));
     }
 
     public void RemoveTask(DownloadTask task)
     {
-        Tasks.Remove(task);
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Tasks.Remove(task);
+            return;
+        }
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => Tasks.Remove(task));
     }
 
     public void StopQueue()
     {
-        _cts?.Cancel();
+        lock (_stateLock)
+        {
+            _cts?.Cancel();
+        }
     }
 
-    public async Task StartQueueAsync()
+    public async Task<bool> StartQueueAsync()
     {
-        if (_isProcessing) return;
-        _isProcessing = true;
-        _cts = new CancellationTokenSource();
+        CancellationTokenSource cts;
 
-        await Task.Run(async () =>
+        lock (_stateLock)
         {
-            try
+            if (_isProcessing) return false;
+
+            _isProcessing = true;
+            _cts = new CancellationTokenSource();
+            cts = _cts;
+        }
+
+        var completedSuccessfully = true;
+
+        try
+        {
+            await Task.Run(async () =>
             {
-                while (!_cts.Token.IsCancellationRequested)
+                while (!cts.Token.IsCancellationRequested)
                 {
                     DownloadTask? task = null;
 
@@ -57,16 +82,22 @@ public class DownloadQueueManager : IDownloadQueueManager
 
                     if (task == null) break;
 
-                    await _semaphore.WaitAsync(_cts.Token);
+                    await _semaphore.WaitAsync(cts.Token);
                     try
                     {
-                        task.Status = DownloadStatus.Downloading;
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            task.Status = DownloadStatus.Downloading;
+                        });
 
                         var progressReporter = new Progress<DownloadProgress>(p =>
                         {
-                            task.Progress = p.Percentage;
-                            task.Speed = p.Speed;
-                            task.RemainingTime = p.RemainingTime;
+                            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                            {
+                                task.Progress = p.Percentage;
+                                task.Speed = p.Speed;
+                                task.RemainingTime = p.RemainingTime;
+                            });
                         });
 
                         await _ytDlpService.DownloadVideoAsync(
@@ -74,32 +105,52 @@ public class DownloadQueueManager : IDownloadQueueManager
                             task.Options, 
                             task.DownloadFolderPath, 
                             progressReporter,
-                            _cts.Token); 
+                            cts.Token); 
 
-                        task.Status = DownloadStatus.Completed;
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            task.Status = DownloadStatus.Completed;
+                        });
                     }
                     catch (Exception)
                     {
-                        task.Status = _cts.Token.IsCancellationRequested 
-                            ? DownloadStatus.Pending 
-                            : DownloadStatus.Failed;
-                        
-                        task.Progress = 0;
-                        task.Speed = string.Empty;
-                        task.RemainingTime = string.Empty;
+                        completedSuccessfully = false;
+
+                        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            task.Status = cts.Token.IsCancellationRequested
+                                ? DownloadStatus.Pending
+                                : DownloadStatus.Failed;
+
+                            task.Progress = 0;
+                            task.Speed = string.Empty;
+                            task.RemainingTime = string.Empty;
+                        });
                     }
                     finally
                     {
                         _semaphore.Release();
                     }
                 }
-            }
-            finally
+            }, cts.Token);
+
+            return completedSuccessfully && !cts.Token.IsCancellationRequested;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        finally
+        {
+            lock (_stateLock)
             {
-                _isProcessing = false;
-                _cts?.Dispose();
-                _cts = null;
+                if (ReferenceEquals(_cts, cts))
+                {
+                    _isProcessing = false;
+                    _cts.Dispose();
+                    _cts = null;
+                }
             }
-        });
+        }
     }
 }

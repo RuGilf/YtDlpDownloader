@@ -12,5 +12,5 @@ public interface IDownloadQueueManager
     void RemoveTask(DownloadTask task);
     void StopQueue();
 
-    Task StartQueueAsync();
+    Task<bool> StartQueueAsync();
 }

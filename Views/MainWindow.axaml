@@ -10,6 +10,7 @@
                  x:DataType="vm:MainWindowViewModel"
                  Title="YtDlp Downloader"
                  Width="850" Height="700"
+                 MinWidth="760" MinHeight="620"
                  WindowStartupLocation="CenterScreen">
 
     <suki:SukiWindow.Styles>
@@ -29,9 +30,12 @@
 
         <!-- ================= ШАПКА ПРИЛОЖЕНИЯ ================= -->
         <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,16">
-            <TextBlock Grid.Column="0" Text="Загрузчик видео" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Text="Загрузчик видео" FontSize="20" FontWeight="Bold"/>
+                <TextBlock Text="Анализ, очередь и загрузка через yt-dlp" FontSize="12" Opacity="0.55"/>
+            </StackPanel>
             <Button Grid.Column="1" 
-                    Content="🌓 Сменить тему" 
+                    Content="Сменить тему" 
                     Click="ToggleTheme_Click"
                     Classes="Basic" 
                     FontSize="14"/>
@@ -40,24 +44,48 @@
         <!-- ================= БЛОК ВВОД ССЫЛКИ ================= -->
         <suki:GlassCard Grid.Row="1" Padding="16,12" Margin="0,0,0,16">
             <StackPanel Spacing="12">
-                <Grid ColumnDefinitions="*, Auto">
+                <Grid ColumnDefinitions="*, Auto, Auto">
                     <TextBox Grid.Column="0"
                              Text="{Binding VideoUrl}"
                              PlaceholderText="Вставьте ссылку на видео или плейлист (https://...)"
                              VerticalAlignment="Stretch"
                              VerticalContentAlignment="Center"
-                             FontSize="14"/> 
+                             FontSize="14"
+                             IsEnabled="{Binding CanEditRequest}"/> 
                     
                     <Button Grid.Column="1"
                             Content="Анализировать"
                             Command="{Binding AnalyzeVideoCommand}"
                             Classes="Flat Primary"
+                            IsEnabled="{Binding CanAnalyze}"
                             Margin="12,0,0,0"
                             Width="140" Height="36"
                             FontWeight="Medium"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center"/>
+
+                    <Button Grid.Column="2"
+                            Content="Отменить"
+                            Command="{Binding CancelAnalysisCommand}"
+                            Classes="Basic"
+                            IsVisible="{Binding IsLoading}"
+                            Margin="8,0,0,0"
+                            Width="96" Height="36"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"/>
                 </Grid>
+
+                <Border Background="#22FF3B30"
+                        BorderBrush="#66FF3B30"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="12,10"
+                        IsVisible="{Binding DependenciesMissing}">
+                    <TextBlock Text="Не найдены yt-dlp или ffmpeg. Установите их в системе или положите бинарники в папку tools рядом с приложением."
+                               TextWrapping="Wrap"
+                               Foreground="#FF3B30"
+                               FontSize="13"/>
+                </Border>
 
                 <ProgressBar IsIndeterminate="True" 
                              Height="3" 
@@ -112,7 +140,8 @@
                                           SelectedItem="{Binding SelectedResolution}"
                                           HorizontalAlignment="Stretch"
                                           Height="38"
-                                          CornerRadius="6"/>
+                                          CornerRadius="6"
+                                          IsEnabled="{Binding CanEditRequest}"/>
                             </StackPanel>
 
                             <!-- 2. Формат контейнера -->
@@ -122,7 +151,8 @@
                                           SelectedItem="{Binding SelectedContainer}"
                                           HorizontalAlignment="Stretch"
                                           Height="38"
-                                          CornerRadius="6"/>
+                                          CornerRadius="6"
+                                          IsEnabled="{Binding CanEditRequest}"/>
                             </StackPanel>
 
                             <!-- 3. Выбор субтитров -->
@@ -132,7 +162,8 @@
                                           SelectedItem="{Binding SelectedSubtitle}"
                                           HorizontalAlignment="Stretch"
                                           Height="38"
-                                          CornerRadius="6"/>
+                                          CornerRadius="6"
+                                          IsEnabled="{Binding CanEditRequest}"/>
                             </StackPanel>
 
                             <!-- 4. Выбор аудиодорожки (дубляж) -->
@@ -142,14 +173,15 @@
                                           SelectedItem="{Binding SelectedAudioTrack}"
                                           HorizontalAlignment="Stretch"
                                           Height="38"
-                                          CornerRadius="6"/>
+                                          CornerRadius="6"
+                                          IsEnabled="{Binding CanEditRequest}"/>
                             </StackPanel>
                         </Grid>
 
                         <!-- Панель опций -->
                         <StackPanel Orientation="Horizontal" Spacing="20" Margin="0,12">
-                            <CheckBox Content="Встроить тэги метаданных" IsChecked="{Binding EmbedMetadata}"/>
-                            <CheckBox Content="Встроить обложку" IsChecked="{Binding EmbedThumbnail}"/>
+                            <CheckBox Content="Встроить тэги метаданных" IsChecked="{Binding EmbedMetadata}" IsEnabled="{Binding CanEditRequest}"/>
+                            <CheckBox Content="Встроить обложку" IsChecked="{Binding EmbedThumbnail}" IsEnabled="{Binding CanEditRequest}"/>
                         </StackPanel>
 
                         <!-- ДВЕ КНОПКИ: Назад и Добавить в очередь -->
@@ -168,6 +200,7 @@
                                     Content="Добавить в очередь" 
                                     Command="{Binding AddToQueueCommand}"
                                     Classes="Flat Accent"
+                                    IsEnabled="{Binding CanAddCurrentVideo}"
                                     Height="40"
                                     Margin="10,0,0,0"
                                     HorizontalAlignment="Stretch"
@@ -194,7 +227,7 @@
                                     FontSize="13" 
                                     FontWeight="Medium"
                                     Padding="12,6"
-                                    IsEnabled="{Binding !IsDownloading}"/>
+                                    IsEnabled="{Binding CanClearQueue}"/>
                         </Grid>
                     </Border>
 
@@ -203,6 +236,7 @@
                              Background="Transparent" 
                              BorderThickness="0"
                              Padding="12"
+                             IsVisible="{Binding HasQueueTasks}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.Template>
                             <ControlTemplate>
@@ -210,10 +244,6 @@
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                         <ItemsPresenter ItemsPanel="{TemplateBinding ItemsPanel}" />
                                     </ScrollViewer>
-                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" IsVisible="{Binding !QueueTasks.Count}">
-                                        <PathIcon Data="M19,9H15V3H9V9H5L12,16L19,9M5,18V20H19V18H5Z" Width="32" Height="32" Opacity="0.2"/>
-                                        <TextBlock Text="Очередь пуста" Opacity="0.4" FontSize="15" FontWeight="Medium" HorizontalAlignment="Center"/>
-                                    </StackPanel>
                                 </Panel>
                             </ControlTemplate>
                         </ListBox.Template>
@@ -264,12 +294,12 @@
                                         </Grid>
 
                                         <!-- Удаление задачи -->
-                                        <Button Grid.Column="2" 
-                                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RemoveTaskCommand}"
-                                                CommandParameter="{Binding}"
-                                                Classes="Basic" Width="32" Height="32"
-                                                CornerRadius="16"
-                                                IsEnabled="{Binding !$parent[Window].((vm:MainWindowViewModel)DataContext).IsDownloading}">
+                            <Button Grid.Column="2" 
+                                    Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RemoveTaskCommand}"
+                                    CommandParameter="{Binding}"
+                                    Classes="Basic" Width="32" Height="32"
+                                    CornerRadius="16"
+                                    IsEnabled="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CanClearQueue}">
                                             <PathIcon Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" Width="12" Height="12" Foreground="#FF3B30" Opacity="0.8"/>
                                         </Button>
 
@@ -278,6 +308,16 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+
+                    <StackPanel Grid.Row="1"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="8"
+                                IsVisible="{Binding IsQueueEmpty}">
+                        <PathIcon Data="M19,9H15V3H9V9H5L12,16L19,9M5,18V20H19V18H5Z" Width="32" Height="32" Opacity="0.2"/>
+                        <TextBlock Text="Очередь пуста" Opacity="0.45" FontSize="15" FontWeight="Medium" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Вставьте ссылку выше и нажмите «Анализировать»" Opacity="0.35" FontSize="12" HorizontalAlignment="Center"/>
+                    </StackPanel>
                 </Grid>
             </suki:GlassCard>
             
@@ -300,9 +340,28 @@
                         Content="Выбрать папку" 
                         Command="{Binding ChangeFolderCommand}"
                         Classes="Basic"
+                        IsEnabled="{Binding CanChangeFolder}"
                         FontSize="13"
                         FontWeight="Medium"/>
             </Grid>
+
+            <Border BorderBrush="{DynamicResource SukiControlBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12,10">
+                <Grid ColumnDefinitions="Auto, *">
+                    <Ellipse Grid.Column="0"
+                             Width="8" Height="8"
+                             Fill="{DynamicResource SukiPrimaryColor}"
+                             VerticalAlignment="Center"
+                             Margin="0,0,10,0"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding StatusText}"
+                               TextWrapping="Wrap"
+                               FontSize="13"
+                               Opacity="0.75"/>
+                </Grid>
+            </Border>
 
             <!-- Старт скачивания / Ход работы -->
             <Panel Height="48">
@@ -312,8 +371,8 @@
                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                         FontSize="15" FontWeight="SemiBold"
-                        IsEnabled="{Binding !IsDownloading}"
-                        IsVisible="{Binding !IsDownloading}"/>
+                        IsEnabled="{Binding CanStartDownload}"
+                        IsVisible="{Binding IsNotDownloading}"/>
 
                 <suki:GlassCard Padding="20,0" CornerRadius="8"
                                 IsVisible="{Binding IsDownloading}"

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
 using YtDlpDownloader.Models;
 
@@ -15,7 +14,7 @@ public class VideoMetadataParser : IMetadataParser
         var duration = root.TryGetProperty("duration_string", out var d) ? d.GetString() : "00:00";
         var thumbnail = root.TryGetProperty("thumbnail", out var th) ? th.GetString() : string.Empty;
 
-        var resolutions = new List<int>();
+        var resolutions = new List<string> { "Максимальное" };
         var containers = new List<string>();
         var audioTracks = new List<string> { "Оригинал" };
         var subtitles = new List<string> { "Без субтитров" };
@@ -27,16 +26,7 @@ public class VideoMetadataParser : IMetadataParser
                 var vcodec = f.TryGetProperty("vcodec", out var vc) ? vc.GetString() : string.Empty;
                 var acodec = f.TryGetProperty("acodec", out var ac) ? ac.GetString() : string.Empty;
 
-                if (vcodec != "none" && f.TryGetProperty("height", out var hProp) && hProp.ValueKind == JsonValueKind.Number)
-                {
-                    int height = hProp.GetInt32();
-                    if (height > 0 && !resolutions.Contains(height))
-                    {
-                        resolutions.Add(height);
-                    }
-                }
-
-                if (vcodec != "none" && f.TryGetProperty("ext", out var extProp))
+                if (YtDlpFormatMetadata.IsDownloadableVideoFormat(f) && f.TryGetProperty("ext", out var extProp))
                 {
                     var ext = extProp.GetString()?.ToUpper();
                     if (!string.IsNullOrEmpty(ext) && !containers.Contains(ext))
@@ -54,14 +44,9 @@ public class VideoMetadataParser : IMetadataParser
                     }
                 }
             }
-        }
 
-        var sortedResolutions = resolutions
-            .OrderByDescending(r => r)
-            .Select(r => $"{r}p")
-            .ToList();
-        
-        sortedResolutions.Insert(0, "Максимальное"); 
+            resolutions = YtDlpFormatMetadata.ExtractVideoResolutions(formatsProp);
+        }
 
         if (!containers.Contains("MP4")) containers.Add("MP4");
         if (!containers.Contains("MKV")) containers.Add("MKV");
@@ -90,7 +75,7 @@ public class VideoMetadataParser : IMetadataParser
             Author = author ?? "Неизвестный автор",
             Duration = duration ?? "00:00",
             ThumbnailUrl = thumbnail ?? string.Empty,
-            AvailableResolutions = sortedResolutions,
+            AvailableResolutions = resolutions,
             AvailableContainers = containers,
             AvailableSubtitles = subtitles,
             AvailableAudioTracks = audioTracks
